@@ -1,4 +1,5 @@
 import pygame
+from pygame import mixer
 import os
 import random
 import json
@@ -28,6 +29,9 @@ YELLOW_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_yellow.png"
 # Background
 BG = pygame.transform.scale((pygame.image.load(os.path.join("assets", "background-black.png"))), (WIDTH, HEIGHT))
 
+# Exploded Enemy Ship
+EXPLODED_ENEMY = pygame.transform.scale((pygame.image.load('assets/explosion.png')), (50, 50))
+
 # Font for text
 main_font = pygame.font.SysFont("firacodenerdfontcompletemono", 30, bold=False)
 
@@ -53,6 +57,7 @@ class Ship:
 
     def draw(self, window):
         window.blit(self.ship_img, (self.x, self.y))
+        self.health_bar(window)
         for laser in self.lasers:
             laser.draw(window)
 
@@ -63,9 +68,14 @@ class Ship:
             if laser.is_offscreen(HEIGHT):
                 self.lasers.remove(laser)
             elif laser.is_colliding(obj):
-                obj.health -= 10
+                if obj.health > 0:
+                    obj.health -= 10
                 if laser in self.lasers:
                     self.lasers.remove(laser)
+
+    def health_bar(self, window):
+        pygame.draw.rect(window, (255, 0, 0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width(), 10))
+        pygame.draw.rect(window, (0, 255, 0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width() * (self.health/self.max_health), 10))
 
     @property
     def width(self):
@@ -83,7 +93,7 @@ class Ship:
 
 
 class Player(Ship):
-    number_hit = 0
+    number_hit = 1
     total_shots = 1
     highest_level = 0
 
@@ -94,6 +104,10 @@ class Player(Ship):
         self.mask = pygame.mask.from_surface(self.ship_img)
         self.max_health = health
 
+    @property
+    def get_number_hit(self):
+        return self.number_hit
+
     def move_lasers(self, vel, objs):
         self.cooldown_count()
         for laser in self.lasers:
@@ -103,11 +117,16 @@ class Player(Ship):
             else:
                 for obj in objs:
                     if collision(obj, laser):
-                        print("Collision!")
-                        objs.remove(obj)
-                        self.number_hit += 1
-                        if laser in self.lasers:
-                            self.lasers.remove(laser)
+                        if obj.alive:
+                            obj.health -= 10
+                            if obj.health == 0:
+                                obj.ship_img = EXPLODED_ENEMY
+                                exploded = mixer.Sound('assets/explosion.wav')
+                                exploded.play()
+                            print("Collision!")
+                            if laser in self.lasers:
+                                self.lasers.remove(laser)
+                                self.number_hit += 1
 
     def shoot(self):
         if self.cooldown == 0:
@@ -115,19 +134,26 @@ class Player(Ship):
             self.lasers.append(laser)
             self.cooldown = 1
             self.total_shots += 1
+            laser = mixer.Sound('assets/laser.wav')
+            laser.play()
 
 
 class Enemy(Ship):
+    alive = True
+    dead_timer = 60
+
     colors = {
         "red": (RED_SHIP, RED_LASER),
         "green": (GREEN_SHIP, BLUE_LASER),
         "blue": (BLUE_SHIP, GREEN_LASER)
     }
 
-    def __init__(self, x: int, y: int, color: str, health: int = 100):
-        super().__init__(x, y, health)
+    def __init__(self, x: int, y: int, color: str):
+        super().__init__(x, y)
+        self.health = 20 if color == "blue" else 10
         self.ship_img, self.laser_img = self.colors[color]
         self.mask = pygame.mask.from_surface(self.ship_img)
+        self.max_health = self.health
 
     def move(self, vel):
         self.y += vel
@@ -176,19 +202,94 @@ def collision(obj1, obj2):
     return obj1.mask.overlap(obj2.mask, (offset_x, offset_y)) is not None
 
 
-def write_data(player):
-    player_acc = round(player.number_hit/player.total_shots, 2) * 100
-    if data['accuracy'] < player_acc:
-        data['accuracy'] = player_acc
-    if data['high_score'] < player.number_hit:
-        data['high_score'] = player.number_hit
-    if data['highest_level'] < player.highest_level:
-        data['highest_level'] = player.highest_level
+def write_data(player, player_name):
+    player_acc = float(f"{(player.number_hit/player.total_shots * 100):.2f}")
+    if data['players'][player_name]['accuracy'] < player_acc and player.get_number_hit > data['players'][player_name]['high_score']:
+        data['players'][player_name]['accuracy'] = player_acc
+    if data['players'][player_name]['high_score'] < player.number_hit:
+        data['players'][player_name]['high_score'] = player.number_hit
+    if data['players'][player_name]['highest_level'] < player.highest_level:
+        data['players'][player_name]['highest_level'] = player.highest_level
     with open("sav_data.json", 'w') as updated:
         json.dump(data, updated, indent=2)
 
 
+def create_data(player_name):
+    data['players'][player_name] = {}
+    data['players'][player_name]['accuracy'] = 0.00
+    data['players'][player_name]['high_score'] = 0
+    data['players'][player_name]['highest_level'] = 1
+    with open("sav_data.json", 'w') as updated:
+        json.dump(data, updated, indent=2)
+
+
+def clear_name(name):
+    if name in data['players']:
+        del data['players'][name]
+        with open("sav_data.json", 'w') as updated:
+            json.dump(data, updated, indent=2)
+    else:
+        print(f"Player {name} does not exist")
+
+
+def leaderboard():
+    run = True
+    menu_font = pygame.font.SysFont("firacodenerdfontcompletemono", 40)
+    quit_font = pygame.font.SysFont("firacodenerdfontcompletemono", 25)
+    while run:
+        WIN.blit(BG, (0, 0))
+        offset = 0
+        for player in data['players']:
+            title = menu_font.render(f"{player} high score: {data['players'][player]['high_score']}", True, (255, 255, 255))
+            WIN.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//4 + offset))
+            offset += title.get_height() + 100
+        quit_title = quit_font.render("**Press e to return to main menu**", True, (255, 255, 255))
+        remove_name = quit_font.render("**Press c to remove name from leaderboard**", True, (255, 255, 255))
+        WIN.blit(quit_title, (WIDTH//2 - quit_title.get_width()//2, HEIGHT//4 + offset))
+        offset += quit_title.get_height()
+        WIN.blit(remove_name, (WIDTH//2 - remove_name.get_width()//2, HEIGHT//4 + offset))
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_e]:
+            run = False
+        if keys[pygame.K_c]:
+            name = input("Who would you like to remove? ")
+            clear_name(name)
+
+
+def menu():
+    run = True
+    menu_font = pygame.font.SysFont("firacodenerdfontcompletemono", 40)
+    while run:
+        WIN.blit(BG, (0, 0))
+        first = menu_font.render("Press 1 to play", True, (255, 255, 255))
+        second = menu_font.render("Press 2 for leaderboard", True, (255, 255, 255))
+        third = menu_font.render("Press 3 or q to quit", True, (255, 255, 255))
+        options = [first, second, third]
+        offset = 0
+        for option in options:
+            WIN.blit(option, (WIDTH//2 - option.get_width()//2, HEIGHT//4 + offset))
+            offset += option.get_height() + 100
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_1]:
+            main()
+        if keys[pygame.K_2]:
+            leaderboard()
+        if keys[pygame.K_3] or keys[pygame.K_q]:
+            quit()
+
+
 def main():
+    player_name = input("What's your name? ")
+    if player_name not in data['players']:
+        create_data(player_name)
     run = True
     fps = 60
     level = 0
@@ -204,8 +305,14 @@ def main():
     lost = False
     lost_count = 0
 
-    player = Player(WIDTH//2 - 70, HEIGHT - 100)
+    player = Player(WIDTH//2 - 70, HEIGHT - 170)
     lost_text = LostFont(20)
+
+    # Background Music
+    mixer.init()
+    mixer.music.load('assets/background.wav')
+    mixer.music.set_volume(0.7)
+    mixer.music.play(-1)
 
     # function to draw images onto the window
     def redraw_window():
@@ -215,23 +322,23 @@ def main():
         # render the lives and level labels
         WIN.blit(lives_label, (10, 10))
         WIN.blit(level_label, (WIDTH - level_label.get_width() - 10, 10))
-        test_label = main_font.render(f"enemies = {len(enemies)}", True, (255, 255, 255))
+        test_label = main_font.render(f"Enemies = {len(enemies)}", True, (255, 255, 255))
         WIN.blit(test_label, (10, HEIGHT - test_label.get_height() - 10))
-        laser_label = main_font.render(f"lasers = {len(player.lasers)}", True, (255, 255, 255))
-        WIN.blit(laser_label, (WIDTH - laser_label.get_width() - 10, HEIGHT - test_label.get_height() - 10))
+        number_hit = main_font.render(f"Hit = {player.get_number_hit}", True, (255, 255, 255))
+        WIN.blit(number_hit, (WIDTH - number_hit.get_width() - 10, HEIGHT - test_label.get_height() - 10))
         health_label = main_font.render(f"Health: {player.health}", True, (255, 255, 255))
         WIN.blit(health_label, (WIDTH//2 - health_label.get_width()//2, 10))
-        acc_label = main_font.render(f"Acc: {round(player.number_hit/player.total_shots, 2) * 100}%", True, (255, 255, 255))
+        acc_label = main_font.render(f"Acc: {(player.number_hit/player.total_shots * 100):.2f}%", True, (255, 255, 255))
         WIN.blit(acc_label, (WIDTH//2 - acc_label.get_width()//2, HEIGHT - acc_label.get_height() - 10))
-        high_score_label = main_font.render(f"Highest acc: {data['accuracy']}%", True, (255, 255, 255))
+        high_score_label = main_font.render(f"Highest acc: {data['players'][player_name]['accuracy']}%", True, (255, 255, 255))
         WIN.blit(high_score_label, (10, lives_label.get_height() + 20))
-        highest_hit_label = main_font.render(f"Highest hit: {data['high_score']}", True, (255, 255, 255))
+        highest_hit_label = main_font.render(f"Highest hit: {data['players'][player_name]['high_score']}", True, (255, 255, 255))
         WIN.blit(highest_hit_label, (WIDTH - highest_hit_label.get_width() - 10, lives_label.get_height() + 10))
 
         if lost:
-            if lost_text.font_size < 200:
-                lost_text.render()
+            if lost_text.font_size < 150:
                 lost_text.font_size += 1
+            lost_text.render()
 
         for en in enemies:
             en.draw(WIN)
@@ -245,11 +352,15 @@ def main():
         redraw_window()
         if lives <= 0 or player.health <= 0:
             lost = True
+            mixer.music.stop()
+            ded = mixer.Sound('assets/ded.wav')
+            ded.set_volume(1.0)
+            ded.play()
             lost_count += 1
 
         if lost:
-            if lost_text.font_size > 200 or lost_count >= fps * 4:
-                write_data(player)
+            if lost_count >= fps * 5.5:
+                write_data(player, player_name)
                 run = False
             else:
                 continue
@@ -257,7 +368,7 @@ def main():
         if len(enemies) == 0:
             level += 1
             player.highest_level += 1
-            wave_len += 5
+            wave_len += 3
             for i in range(wave_len):
                 enemy = Enemy(random.randrange(50, WIDTH - 100, 20),
                               random.randrange(-1500, -100), random.choice(["red", "green", "blue"]))
@@ -265,7 +376,9 @@ def main():
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
+                quit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                player.shoot()
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a] and player.x > 0:
             player.x -= player_vel
@@ -273,26 +386,39 @@ def main():
             player.y -= player_vel
         if keys[pygame.K_d] and player.x < WIDTH - player.width:
             player.x += player_vel
-        if keys[pygame.K_s] and player.y < HEIGHT - player.height:
+        if keys[pygame.K_s] and player.y < HEIGHT - player.height - 30:
             player.y += player_vel
         if keys[pygame.K_SPACE]:
             player.shoot()
 
         for enemy in enemies[:]:
-            enemy.move(enemy_vel)
             enemy.move_lasers(laser_vel, player)
-            if random.randrange(0, fps * 3) == 1:
-                enemy.shoot()
-            if collision(enemy, player):
-                player.health -= 20
-                enemies.remove(enemy)
-            elif enemy.y > HEIGHT - enemy.height:
-                if lives > 0:
-                    lives -= 1
-                enemies.remove(enemy)
+            if enemy.health == 0:
+                enemy.alive = False
+            if enemy.alive:
+                enemy.move(enemy_vel)
+                if random.randrange(0, fps * 3) == 1:
+                    enemy.shoot()
+                if collision(enemy, player):
+                    if player.health - 20 > 0:
+                        player.health -= 20
+                    else:
+                        player.health = 0
+                    explosion = mixer.Sound('assets/explosion.wav')
+                    explosion.play()
+                    enemies.remove(enemy)
+                elif enemy.y > HEIGHT - enemy.height:
+                    if lives > 0:
+                        lives -= 1
+                    enemies.remove(enemy)
+            else:
+                if enemy.dead_timer <= 0:
+                    enemies.remove(enemy)
+                else:
+                    enemy.dead_timer -= 1
 
         player.move_lasers(-laser_vel, enemies)
 
 
 if __name__ == '__main__':
-    main()
+    menu()
