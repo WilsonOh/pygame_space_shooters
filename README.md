@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------------------
-# Some random pygame project I ripped off from youtube with some add ons from myself
+# Some random pygame project I ripped off from youtube with some add-ons from myself
 ------------------------------------------------------------------------------------
 
 ## **FEATURES**:
@@ -8,4 +8,4 @@
 - Sound!!
 - Darksouls red expanding death message thingy
 
-### Forgive my shitty code it's my first pygame :cry:
+### ==Forgive my shitty code it's my first pygame :cry:==
