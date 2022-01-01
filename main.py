@@ -1,7 +1,10 @@
 import pygame
-import time
 import os
 import random
+import json
+
+with open("sav_data.json") as sav:
+    data = json.load(sav)
 
 WIDTH, HEIGHT = 750, 750
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -9,21 +12,21 @@ pygame.display.set_caption("Space Shooters")
 pygame.font.init()
 
 # Ship Images
-RED_SHIP = pygame.image.load(os.path.join("pixel_ship_red_small.png"))
-BLUE_SHIP = pygame.image.load(os.path.join("pixel_ship_green_small.png"))
-GREEN_SHIP = pygame.image.load(os.path.join("pixel_ship_blue_small.png"))
+RED_SHIP = pygame.image.load(os.path.join("assets", "pixel_ship_red_small.png"))
+BLUE_SHIP = pygame.image.load(os.path.join("assets", "pixel_ship_green_small.png"))
+GREEN_SHIP = pygame.image.load(os.path.join("assets", "pixel_ship_blue_small.png"))
 
 # Player Ship
-YELLOW_SHIP = pygame.image.load(os.path.join("pixel_ship_yellow.png"))
+YELLOW_SHIP = pygame.image.load(os.path.join("assets", "pixel_ship_yellow.png"))
 
 # Lasers
-RED_LASER = pygame.image.load(os.path.join("pixel_laser_red.png"))
-BLUE_LASER = pygame.image.load(os.path.join("pixel_laser_blue.png"))
-GREEN_LASER = pygame.image.load(os.path.join("pixel_laser_green.png"))
-YELLOW_LASER = pygame.image.load(os.path.join("pixel_laser_yellow.png"))
+RED_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_red.png"))
+BLUE_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_blue.png"))
+GREEN_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_green.png"))
+YELLOW_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_yellow.png"))
 
 # Background
-BG = pygame.transform.scale((pygame.image.load(os.path.join("background-black.png"))), (WIDTH, HEIGHT))
+BG = pygame.transform.scale((pygame.image.load(os.path.join("assets", "background-black.png"))), (WIDTH, HEIGHT))
 
 # Font for text
 main_font = pygame.font.SysFont("firacodenerdfontcompletemono", 30, bold=False)
@@ -45,23 +48,24 @@ class Ship:
     def cooldown_count(self):
         if self.cooldown >= self.COOLDOWN:
             self.cooldown = 0
-        elif self.cooldown >= 0:
+        elif self.cooldown > 0:
             self.cooldown += 1
 
     def draw(self, window):
         window.blit(self.ship_img, (self.x, self.y))
         for laser in self.lasers:
-            laser.render()
+            laser.draw(window)
 
     def move_lasers(self, vel, obj):
         self.cooldown_count()
         for laser in self.lasers:
             laser.move(vel)
-            if laser.is_offscreen():
+            if laser.is_offscreen(HEIGHT):
                 self.lasers.remove(laser)
             elif laser.is_colliding(obj):
                 obj.health -= 10
-                self.lasers.remove(laser)
+                if laser in self.lasers:
+                    self.lasers.remove(laser)
 
     @property
     def width(self):
@@ -79,6 +83,10 @@ class Ship:
 
 
 class Player(Ship):
+    number_hit = 0
+    total_shots = 1
+    highest_level = 0
+
     def __init__(self, x: int, y: int, health: int = 100):
         super().__init__(x, y, health)
         self.ship_img = YELLOW_SHIP
@@ -90,22 +98,30 @@ class Player(Ship):
         self.cooldown_count()
         for laser in self.lasers:
             laser.move(vel)
-            if laser.is_offscreen():
+            if laser.is_offscreen(HEIGHT):
                 self.lasers.remove(laser)
             else:
                 for obj in objs:
-                    if laser.is_colliding(obj):
+                    if collision(obj, laser):
                         print("Collision!")
                         objs.remove(obj)
+                        self.number_hit += 1
                         if laser in self.lasers:
                             self.lasers.remove(laser)
+
+    def shoot(self):
+        if self.cooldown == 0:
+            laser = Laser(self.x, self.y, self.laser_img)
+            self.lasers.append(laser)
+            self.cooldown = 1
+            self.total_shots += 1
 
 
 class Enemy(Ship):
     colors = {
         "red": (RED_SHIP, RED_LASER),
-        "green": (GREEN_SHIP, GREEN_LASER),
-        "blue": (BLUE_SHIP, BLUE_LASER)
+        "green": (GREEN_SHIP, BLUE_LASER),
+        "blue": (BLUE_SHIP, GREEN_LASER)
     }
 
     def __init__(self, x: int, y: int, color: str, health: int = 100):
@@ -116,6 +132,12 @@ class Enemy(Ship):
     def move(self, vel):
         self.y += vel
 
+    def shoot(self):
+        if self.cooldown == 0:
+            laser = Laser(self.x - 20, self.y, self.laser_img)
+            self.lasers.append(laser)
+            self.cooldown = 1
+
 
 class Laser:
     def __init__(self, x, y, img):
@@ -124,14 +146,14 @@ class Laser:
         self.img = img
         self.mask = pygame.mask.from_surface(self.img)
 
-    def render(self):
-        WIN.blit(self.img, (self.x, self.y))
+    def draw(self, window):
+        window.blit(self.img, (self.x, self.y))
 
     def move(self, vel):
-        self.y -= vel
+        self.y += vel
 
-    def is_offscreen(self):
-        return self.y <= 0 or self.y >= HEIGHT
+    def is_offscreen(self, height):
+        return not(0 <= self.y <= height)
 
     def is_colliding(self, obj):
         return collision(self, obj)
@@ -143,15 +165,27 @@ class LostFont:
 
     def render(self):
         lost_font = pygame.font.SysFont("arial", self.font_size, bold=True)
-        lost_text = lost_font.render("YOU LOST!!", True, (255, 0, 0))
+        lost_text = lost_font.render("YOU DIED!!", True, (255, 0, 0))
         WIN.blit(lost_text, (WIDTH // 2 - lost_text.get_width() // 2, HEIGHT // 2 - lost_text.get_height()//2))
 
 
 # Function to determine if two surfaces are overlapping each other (colliding)
 def collision(obj1, obj2):
-    x_offset = obj1.x - obj2.x
-    y_offset = obj1.y - obj2.x
-    return obj1.mask.overlap(obj2.mask, (x_offset, y_offset)) is not None
+    offset_x = obj2.x - obj1.x
+    offset_y = obj2.y - obj1.y
+    return obj1.mask.overlap(obj2.mask, (offset_x, offset_y)) is not None
+
+
+def write_data(player):
+    player_acc = round(player.number_hit/player.total_shots, 2) * 100
+    if data['accuracy'] < player_acc:
+        data['accuracy'] = player_acc
+    if data['high_score'] < player.number_hit:
+        data['high_score'] = player.number_hit
+    if data['highest_level'] < player.highest_level:
+        data['highest_level'] = player.highest_level
+    with open("sav_data.json", 'w') as updated:
+        json.dump(data, updated, indent=2)
 
 
 def main():
@@ -181,15 +215,23 @@ def main():
         # render the lives and level labels
         WIN.blit(lives_label, (10, 10))
         WIN.blit(level_label, (WIDTH - level_label.get_width() - 10, 10))
-        test_label = main_font.render(f"Number of enemies = {len(enemies)}", True, (255, 255, 255))
+        test_label = main_font.render(f"enemies = {len(enemies)}", True, (255, 255, 255))
         WIN.blit(test_label, (10, HEIGHT - test_label.get_height() - 10))
-        laser_label = main_font.render(f"Number of lasers = {len(player.lasers)}", True, (255, 255, 255))
+        laser_label = main_font.render(f"lasers = {len(player.lasers)}", True, (255, 255, 255))
         WIN.blit(laser_label, (WIDTH - laser_label.get_width() - 10, HEIGHT - test_label.get_height() - 10))
+        health_label = main_font.render(f"Health: {player.health}", True, (255, 255, 255))
+        WIN.blit(health_label, (WIDTH//2 - health_label.get_width()//2, 10))
+        acc_label = main_font.render(f"Acc: {round(player.number_hit/player.total_shots, 2) * 100}%", True, (255, 255, 255))
+        WIN.blit(acc_label, (WIDTH//2 - acc_label.get_width()//2, HEIGHT - acc_label.get_height() - 10))
+        high_score_label = main_font.render(f"Highest acc: {data['accuracy']}%", True, (255, 255, 255))
+        WIN.blit(high_score_label, (10, lives_label.get_height() + 20))
+        highest_hit_label = main_font.render(f"Highest hit: {data['high_score']}", True, (255, 255, 255))
+        WIN.blit(highest_hit_label, (WIDTH - highest_hit_label.get_width() - 10, lives_label.get_height() + 10))
 
-        # if lost:
-        #     if lost_text.font_size < 200:
-        #         lost_text.render()
-        #         lost_text.font_size += 1
+        if lost:
+            if lost_text.font_size < 200:
+                lost_text.render()
+                lost_text.font_size += 1
 
         for en in enemies:
             en.draw(WIN)
@@ -205,14 +247,16 @@ def main():
             lost = True
             lost_count += 1
 
-        # if lost:
-        #     if lost_count >= fps * 4 or lost_text.font_size > 200:
-        #         run = False
-        #     else:
-        #         continue
+        if lost:
+            if lost_text.font_size > 200 or lost_count >= fps * 4:
+                write_data(player)
+                run = False
+            else:
+                continue
 
         if len(enemies) == 0:
             level += 1
+            player.highest_level += 1
             wave_len += 5
             for i in range(wave_len):
                 enemy = Enemy(random.randrange(50, WIDTH - 100, 20),
@@ -237,12 +281,17 @@ def main():
         for enemy in enemies[:]:
             enemy.move(enemy_vel)
             enemy.move_lasers(laser_vel, player)
-            if enemy.y > HEIGHT - enemy.height:
+            if random.randrange(0, fps * 3) == 1:
+                enemy.shoot()
+            if collision(enemy, player):
+                player.health -= 20
+                enemies.remove(enemy)
+            elif enemy.y > HEIGHT - enemy.height:
                 if lives > 0:
                     lives -= 1
                 enemies.remove(enemy)
 
-        player.move_lasers(laser_vel, enemies)
+        player.move_lasers(-laser_vel, enemies)
 
 
 if __name__ == '__main__':
