@@ -6,6 +6,6 @@
 - Leaderboard (it's unsorted though so it's pretty useless... someone help)
 - Nice Looking menu :D
 - Sound!!
-- Darksouls expanding death message thingy
+- Darksouls red expanding death message thingy
 
 ### Forgive my shitty code it's my first pygame :cry:
