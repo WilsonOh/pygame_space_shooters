@@ -8,4 +8,4 @@
 - Sound!!
 - Darksouls expanding death message thingy
 
-### Forgive my shitty code it's my first pygame
+### Forgive my shitty code it's my first pygame :cry:
