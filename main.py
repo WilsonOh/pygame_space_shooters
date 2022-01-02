@@ -91,6 +91,9 @@ class Ship:
             self.lasers.append(laser)
             self.cooldown = 1
 
+    def exploded(self):
+        return pygame.transform.scale((pygame.image.load('assets/explosion.png')), (self.width, self.height))
+
 
 class Player(Ship):
     number_hit = 1
@@ -120,7 +123,7 @@ class Player(Ship):
                         if obj.alive:
                             obj.health -= 10
                             if obj.health == 0:
-                                obj.ship_img = EXPLODED_ENEMY
+                                obj.ship_img = obj.exploded()
                                 exploded = mixer.Sound('assets/explosion.wav')
                                 exploded.play()
                             print("Collision!")
@@ -228,6 +231,7 @@ def clear_name(name):
         del data['players'][name]
         with open("sav_data.json", 'w') as updated:
             json.dump(data, updated, indent=2)
+        print(f"{name} got removed successfully")
     else:
         print(f"Player {name} does not exist")
 
@@ -368,7 +372,10 @@ def main():
         if len(enemies) == 0:
             level += 1
             player.highest_level += 1
-            wave_len += 3
+            if level == 1:
+                wave_len = 3
+            else:
+                wave_len += level - 1
             for i in range(wave_len):
                 enemy = Enemy(random.randrange(50, WIDTH - 100, 20),
                               random.randrange(-1500, -100), random.choice(["red", "green", "blue"]))
