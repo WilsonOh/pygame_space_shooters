@@ -7,5 +7,6 @@
 - Nice Looking menu :D
 - Sound!!
 - Darksouls red expanding death message thingy
+- Boost Mode!
 
 ### Forgive my shitty code it's my first pygame :cry:
