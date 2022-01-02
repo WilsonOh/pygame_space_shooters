@@ -146,7 +146,7 @@ class Player(Ship):
                 self.boost_cd -= 1
 
     def boost_bar(self, window):
-        boost_cd = pygame.draw.rect(window, (51, 51, 255), (self.x, self.y + self.height + 30,
+        pygame.draw.rect(window, (51, 51, 255), (self.x, self.y + self.height + 30,
                                                             (self.boost_cd/self.BOOST_CD) * self.width, 15))
         bar_font = pygame.font.SysFont("arial", 15, bold=True)
         boost_label = bar_font.render("Boost Loading... ", True, (255, 255, 255))
