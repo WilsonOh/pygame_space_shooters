@@ -4,6 +4,11 @@
       "accuracy": 83.0,
       "high_score": 62,
       "highest_level": 6
+    },
+    "1": {
+      "accuracy": 0.0,
+      "high_score": 0,
+      "highest_level": 1
     }
   }
 }

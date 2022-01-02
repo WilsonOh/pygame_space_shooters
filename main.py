@@ -53,6 +53,7 @@ class Ship:
         self.laser_img = None
         self.lasers = []
         self.cooldown = 0
+        self.max_health = health
 
     def cooldown_count(self):
         if self.cooldown >= self.COOLDOWN:
@@ -79,8 +80,9 @@ class Ship:
                     self.lasers.remove(laser)
 
     def health_bar(self, window):
-        pygame.draw.rect(window, (255, 0, 0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width(), 10))
-        pygame.draw.rect(window, (0, 255, 0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width() * (self.health/self.max_health), 10))
+        pygame.draw.rect(window, (255, 0, 0), (self.x, self.y + self.height + 10, self.width, 10))
+        pygame.draw.rect(window, (0, 255, 0), (self.x, self.y + self.height + 10,
+                                               self.width * (self.health/self.max_health), 10))
 
     @property
     def width(self):
@@ -101,9 +103,15 @@ class Ship:
 
 
 class Player(Ship):
+    BOOST_CD = 300
     number_hit = 1
     total_shots = 1
     highest_level = 0
+    laser_vel = 5
+    boost_cd = 300
+    boost_duration = 120
+    enable_boost = False
+    boost_triggered = False
 
     def __init__(self, x: int, y: int, health: int = 100):
         super().__init__(x, y, health)
@@ -116,8 +124,51 @@ class Player(Ship):
     def get_number_hit(self):
         return self.number_hit
 
+    def boost(self):
+        if self.enable_boost:
+            if self.boost_triggered:
+                self.laser_vel = 10
+                self.COOLDOWN = 10
+                self.boost_duration -= 1
+                if self.boost_duration <= 0:
+                    self.boost_duration = 120
+                    self.enable_boost = False
+                    self.boost_cd = self.BOOST_CD
+                    self.laser_vel = 5
+                    self.COOLDOWN = 30
+                    self.boost_triggered = False
+        else:
+            if self.boost_cd <= 0:
+                self.enable_boost = True
+                if self.boost_duration == 120:
+                    print("Boost ready!")
+            else:
+                self.boost_cd -= 1
+
+    def boost_bar(self, window):
+        boost_cd = pygame.draw.rect(window, (51, 51, 255), (self.x, self.y + self.height + 30,
+                                                            (self.boost_cd/self.BOOST_CD) * self.width, 15))
+        bar_font = pygame.font.SysFont("arial", 15, bold=True)
+        boost_label = bar_font.render("Boost Loading... ", True, (255, 255, 255))
+        boost_cd_label = bar_font.render("BOOOOST!!", True, (255, 255, 153))
+        boost_ready_label = bar_font.render("Boost Ready!", True, (255, 255, 153))
+        if self.boost_cd <= 0:
+            pygame.draw.rect(window, (204, 0, 204), (self.x, self.y + self.height + 30,
+                                                     (self.boost_duration/120) * self.width, 15))
+            if self.boost_triggered:
+                window.blit(boost_cd_label, (self.x - 10 - boost_cd_label.get_width(), self.y + self.height + 23))
+            else:
+                window.blit(boost_ready_label, (self.x - 10 - boost_ready_label.get_width(), self.y + self.height + 23))
+        else:
+            window.blit(boost_label, (self.x - 10 - boost_label.get_width(), self.y + self.height + 23))
+
+    def draw(self, window):
+        super().draw(window)
+        self.boost_bar(window)
+
     def move_lasers(self, vel, objs):
         self.cooldown_count()
+        self.boost()
         for laser in self.lasers:
             laser.move(vel)
             if laser.is_offscreen(HEIGHT):
@@ -131,7 +182,7 @@ class Player(Ship):
                                 obj.ship_img = obj.exploded()
                                 exploded = mixer.Sound('assets/explosion.wav')
                                 exploded.play()
-                            print("Collision!")
+                            # print("Collision!")
                             if laser in self.lasers:
                                 self.lasers.remove(laser)
                                 self.number_hit += 1
@@ -212,7 +263,8 @@ def collision(obj1, obj2):
 
 def write_data(player, player_name):
     player_acc = float(f"{(player.number_hit/player.total_shots * 100):.2f}")
-    if data['players'][player_name]['accuracy'] < player_acc and player.get_number_hit > data['players'][player_name]['high_score']:
+    if data['players'][player_name]['accuracy'] < player_acc and\
+            player.get_number_hit > data['players'][player_name]['high_score']:
         data['players'][player_name]['accuracy'] = player_acc
     if data['players'][player_name]['high_score'] < player.number_hit:
         data['players'][player_name]['high_score'] = player.number_hit
@@ -249,7 +301,8 @@ def leaderboard():
         WIN.blit(BG, (0, 0))
         offset = 0
         for player in data['players']:
-            title = menu_font.render(f"{player} high score: {data['players'][player]['high_score']}", True, (255, 255, 255))
+            title = menu_font.render(f"{player} high score: {data['players'][player]['high_score']}",
+                                     True, (255, 255, 255))
             WIN.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//4 + offset))
             offset += title.get_height() + 100
         quit_title = quit_font.render("**Press e to return to main menu**", True, (255, 255, 255))
@@ -339,10 +392,14 @@ def main():
         WIN.blit(health_label, (WIDTH//2 - health_label.get_width()//2, 10))
         acc_label = main_font.render(f"Acc: {(player.number_hit/player.total_shots * 100):.2f}%", True, (255, 255, 255))
         WIN.blit(acc_label, (WIDTH//2 - acc_label.get_width()//2, HEIGHT - acc_label.get_height() - 10))
-        high_score_label = main_font.render(f"Highest acc: {data['players'][player_name]['accuracy']}%", True, (255, 255, 255))
+        high_score_label = main_font.render(f"Highest acc: {data['players'][player_name]['accuracy']}%",
+                                            True, (255, 255, 255))
         WIN.blit(high_score_label, (10, lives_label.get_height() + 20))
-        highest_hit_label = main_font.render(f"Highest hit: {data['players'][player_name]['high_score']}", True, (255, 255, 255))
+        highest_hit_label = main_font.render(f"Highest hit: {data['players'][player_name]['high_score']}",
+                                             True, (255, 255, 255))
         WIN.blit(highest_hit_label, (WIDTH - highest_hit_label.get_width() - 10, lives_label.get_height() + 10))
+        laser_vel_label = main_font.render(f"Laser Vel: {player.laser_vel}", True, (255, 255, 255))
+        WIN.blit(laser_vel_label, (10, HEIGHT//2 - acc_label.get_height() - 10))
 
         if lost:
             if lost_text.font_size < 150:
@@ -402,6 +459,9 @@ def main():
             player.y += player_vel
         if keys[pygame.K_SPACE]:
             player.shoot()
+        if keys[pygame.K_r] and player.enable_boost:
+            print("Boost triggered!")
+            player.boost_triggered = True
 
         for enemy in enemies[:]:
             enemy.move_lasers(laser_vel, player)
@@ -429,7 +489,7 @@ def main():
                 else:
                     enemy.dead_timer -= 1
 
-        player.move_lasers(-laser_vel, enemies)
+        player.move_lasers(-player.laser_vel, enemies)
 
 
 if __name__ == '__main__':
