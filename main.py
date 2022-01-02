@@ -7,6 +7,11 @@ import json
 with open("sav_data.json") as sav:
     data = json.load(sav)
 
+
+def hello_from_git():
+    pass
+
+
 WIDTH, HEIGHT = 750, 750
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Space Shooters")
