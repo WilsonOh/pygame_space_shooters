@@ -4,6 +4,11 @@ import os
 import random
 import json
 
+pygame.init()
+mixer.init()
+pygame.font.init()
+clock = pygame.time.Clock()
+
 with open("sav_data.json") as sav:
     data = json.load(sav)
 
@@ -15,7 +20,6 @@ def hello_from_git():
 WIDTH, HEIGHT = 750, 750
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Space Shooters")
-pygame.font.init()
 
 # Ship Images
 RED_SHIP = pygame.image.load(os.path.join("assets", "pixel_ship_red_small.png"))
@@ -147,7 +151,7 @@ class Player(Ship):
 
     def boost_bar(self, window):
         pygame.draw.rect(window, (51, 51, 255), (self.x, self.y + self.height + 30,
-                                                            (self.boost_cd/self.BOOST_CD) * self.width, 15))
+                                                 (self.boost_cd/self.BOOST_CD) * self.width, 15))
         bar_font = pygame.font.SysFont("arial", 15, bold=True)
         boost_label = bar_font.render("Boost Loading... ", True, (255, 255, 255))
         boost_cd_label = bar_font.render("BOOOOST!!", True, (255, 255, 153))
@@ -301,7 +305,7 @@ def leaderboard():
         WIN.blit(BG, (0, 0))
         offset = 0
         for player in data['players']:
-            title = menu_font.render(f"{player} high score: {data['players'][player]['high_score']}",
+            title = menu_font.render(f"{player.title()} high score: {data['players'][player]['high_score']}",
                                      True, (255, 255, 255))
             WIN.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//4 + offset))
             offset += title.get_height() + 100
@@ -348,8 +352,36 @@ def menu():
             quit()
 
 
+def pause():
+    mixer.music.pause()
+    paused = True
+    pause_font = pygame.font.SysFont("arial", 100, True)
+    keys_font = pygame.font.SysFont("arial", 20, True)
+    while paused:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    paused = False
+                elif event.key == pygame.K_q:
+                    pygame.quit()
+                    quit()
+                elif event.key == pygame.K_m:
+                    menu()
+        WIN.blit(BG, (0, 0))
+        pause_msg = pause_font.render("GAME PAUSED", True, (255, 0, 0))
+        keys_msg = keys_font.render("Press ESC to continue or q to quit or m to return to main menu", True, (255, 0, 0))
+        WIN.blit(pause_msg, (WIDTH//2 - pause_msg.get_width()//2, HEIGHT//2 - pause_msg.get_height()//2))
+        WIN.blit(keys_msg, (WIDTH//2 - keys_msg.get_width()//2, HEIGHT//2 + pause_msg.get_height() * 2
+                            + keys_msg.get_height()//2 + 15))
+        pygame.display.update()
+        clock.tick(5)
+
+
 def main():
-    player_name = input("What's your name? ")
+    player_name = input("What's your name? ").lower().strip()
     if player_name not in data['players']:
         create_data(player_name)
     run = True
@@ -357,7 +389,6 @@ def main():
     level = 0
     lives = 5
     player_vel = 5
-    clock = pygame.time.Clock()
 
     enemies = []
     wave_len = 0
@@ -371,7 +402,6 @@ def main():
     lost_text = LostFont(20)
 
     # Background Music
-    mixer.init()
     mixer.music.load('assets/background.wav')
     mixer.music.set_volume(0.7)
     mixer.music.play(-1)
@@ -416,6 +446,7 @@ def main():
     while run:
         clock.tick(fps)
         redraw_window()
+
         if lives <= 0 or player.health <= 0:
             lost = True
             mixer.music.stop()
@@ -462,6 +493,9 @@ def main():
         if keys[pygame.K_r] and player.enable_boost:
             print("Boost triggered!")
             player.boost_triggered = True
+        if keys[pygame.K_ESCAPE]:
+            pause()
+            mixer.music.unpause()
 
         for enemy in enemies[:]:
             enemy.move_lasers(laser_vel, player)
