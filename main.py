@@ -379,6 +379,8 @@ def pause():
         pygame.display.update()
         clock.tick(5)
 
+def test_branch():
+    pass
 
 def main():
     player_name = input("What's your name? ").lower().strip()
