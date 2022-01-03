@@ -8,6 +8,6 @@
 - Sound!!
 - Darksouls red expanding death message thingy
 - Boost Mode!
-- A pause menu :shock:
+- A pause menu :astonished:
 
 ### Forgive my shitty code it's my first pygame :cry:
