@@ -107,6 +107,7 @@ class Ship:
 
 
 class Player(Ship):
+    player_vel = 5
     BOOST_CD = 300
     number_hit = 1
     total_shots = 1
@@ -130,11 +131,13 @@ class Player(Ship):
 
     def boost(self):
         if self.enable_boost:
-            if self.boost_triggered:
+            if self.boost_triggered:  # add boost features here
                 self.laser_vel = 10
                 self.COOLDOWN = 10
+                self.player_vel = 10
                 self.boost_duration -= 1
                 if self.boost_duration <= 0:
+                    self.player_vel = 5
                     self.boost_duration = 120
                     self.enable_boost = False
                     self.boost_cd = self.BOOST_CD
@@ -150,21 +153,26 @@ class Player(Ship):
                 self.boost_cd -= 1
 
     def boost_bar(self, window):
+        boost_font = pygame.font.SysFont("firacodenerdfontcompletemono", 20, bold=True)
         pygame.draw.rect(window, (51, 51, 255), (self.x, self.y + self.height + 30,
                                                  (self.boost_cd/self.BOOST_CD) * self.width, 15))
         bar_font = pygame.font.SysFont("arial", 15, bold=True)
         boost_label = bar_font.render("Boost Loading... ", True, (255, 255, 255))
         boost_cd_label = bar_font.render("BOOOOST!!", True, (255, 255, 153))
         boost_ready_label = bar_font.render("Boost Ready!", True, (255, 255, 153))
+        boost_cd_counter = boost_font.render(f"{(self.boost_cd/60):.2f}", True, (255, 255, 255))
+        boost_duration_counter = boost_font.render(f"{(self.boost_duration/60):.2f}", True, (255, 255, 255))
         if self.boost_cd <= 0:
             pygame.draw.rect(window, (204, 0, 204), (self.x, self.y + self.height + 30,
                                                      (self.boost_duration/120) * self.width, 15))
             if self.boost_triggered:
                 window.blit(boost_cd_label, (self.x - 10 - boost_cd_label.get_width(), self.y + self.height + 23))
+                window.blit(boost_duration_counter, (self.x + boost_duration_counter.get_width() + 10, self.y + self.height + 30))
             else:
                 window.blit(boost_ready_label, (self.x - 10 - boost_ready_label.get_width(), self.y + self.height + 23))
         else:
             window.blit(boost_label, (self.x - 10 - boost_label.get_width(), self.y + self.height + 23))
+            window.blit(boost_cd_counter, (self.x + boost_cd_counter.get_width() + 10, self.y + self.height + 30))
 
     def draw(self, window):
         super().draw(window)
@@ -485,16 +493,19 @@ def main():
                 player.shoot()
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a] and player.x > 0:
-            player.x -= player_vel
+            player.x -= player.player_vel
         if keys[pygame.K_w] and player.y > 150:
-            player.y -= player_vel
+            player.y -= player.player_vel
         if keys[pygame.K_d] and player.x < WIDTH - player.width:
-            player.x += player_vel
+            player.x += player.player_vel
         if keys[pygame.K_s] and player.y < HEIGHT - player.height - 30:
-            player.y += player_vel
+            player.y += player.player_vel
         if keys[pygame.K_SPACE]:
             player.shoot()
         if keys[pygame.K_r] and player.enable_boost:
+            boost_sfx = mixer.Sound('assets/powerup.wav')
+            boost_sfx.set_volume(0.2)
+            boost_sfx.play()
             print("Boost triggered!")
             player.boost_triggered = True
         if keys[pygame.K_ESCAPE]:
