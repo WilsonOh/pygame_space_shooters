@@ -381,7 +381,7 @@ def pause():
 
 
 def test_branch():
-    pass
+    print("hello git")
 
 
 def main():
