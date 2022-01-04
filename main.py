@@ -17,7 +17,7 @@ def hello_from_git():
     pass
 
 
-WIDTH, HEIGHT = 750, 750
+WIDTH, HEIGHT = 1000, 1000
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Space Shooters")
 
@@ -166,13 +166,14 @@ class Player(Ship):
             pygame.draw.rect(window, (204, 0, 204), (self.x, self.y + self.height + 30,
                                                      (self.boost_duration/120) * self.width, 15))
             if self.boost_triggered:
-                window.blit(boost_cd_label, (self.x - 10 - boost_cd_label.get_width(), self.y + self.height + 23))
-                window.blit(boost_duration_counter, (self.x + boost_duration_counter.get_width() + 10, self.y + self.height + 30))
+                window.blit(boost_cd_label, (self.x - 11 - boost_cd_label.get_width(), self.y + self.height + 23))
+                window.blit(boost_duration_counter, (self.x + boost_duration_counter.get_width()//2,
+                                                     self.y + self.height + 30))
             else:
                 window.blit(boost_ready_label, (self.x - 10 - boost_ready_label.get_width(), self.y + self.height + 23))
         else:
             window.blit(boost_label, (self.x - 10 - boost_label.get_width(), self.y + self.height + 23))
-            window.blit(boost_cd_counter, (self.x + boost_cd_counter.get_width() + 10, self.y + self.height + 30))
+            window.blit(boost_cd_counter, (self.x + boost_cd_counter.get_width()//2, self.y + self.height + 30))
 
     def draw(self, window):
         super().draw(window)
@@ -400,7 +401,6 @@ def main():
     fps = 60
     level = 0
     lives = 5
-    player_vel = 5
 
     enemies = []
     wave_len = 0
