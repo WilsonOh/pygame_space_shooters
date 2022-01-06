@@ -1,4 +1,3 @@
-from main import collision
 import pygame
 from pygame import mixer
 import os
@@ -6,6 +5,7 @@ import os
 WIDTH, HEIGHT = 1000, 1000
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Space Shooters")
+pygame.init()
 
 # Window Icon
 window_icon = pygame.transform.scale(pygame.image.load('assets/pixel_ship_yellow.png'), (32, 32))
@@ -33,6 +33,13 @@ EXPLODED_ENEMY = pygame.transform.scale((pygame.image.load('assets/explosion.png
 
 # Font for text
 main_font = pygame.font.SysFont("firacodenerdfontcompletemono", 30, bold=False)
+
+
+# Function to determine if two surfaces are overlapping each other (colliding)
+def collision(obj1, obj2):
+    offset_x = obj2.x - obj1.x
+    offset_y = obj2.y - obj1.y
+    return obj1.mask.overlap(obj2.mask, (offset_x, offset_y)) is not None
 
 
 # Create Parent Ship Class
